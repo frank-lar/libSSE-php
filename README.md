@@ -3,13 +3,21 @@
 [![License](https://img.shields.io/badge/License-MIT-428F7E.svg)](LICENSE.md)
 [![Build Status](https://travis-ci.org/tonyhhyip/libSSE-php.svg?branch=master)](https://travis-ci.org/tonyhhyip/libSSE-php)
 
-An easy-to-use, object-oriented library for Server-Sent Events
+An easy-to-use, object-oriented library for Server-Sent Events.
+
+This repository was originally forked from [tonyhhyip/libSSE-php](https://github.com/tonyhhyip/libSSE-php)
+Some options were added to make it work with PHP-FastCGI setups where FastCgi own output buffering cannot be disabled.
+
+### If you are running on PHP-FastCGI:
+
+- Check your fcgid.conf file for **FcgidOutputBufferSize** parameter: it shouldn't be greater than 8192 (8K) for best results.
+- Init SSE with **content_encoding_none = true** and **close_connection = true**. You may need to set **pad_response_data** to a value equal or slightly greater than FcgidOutputBufferSize
 
 ## Installation
 
 To install this package you'll need [composer](https://getcomposer.org/).
 
-Run `composer require tonyhhyip/sse`
+Run `composer require frank-lar/sse`
 
 
 ## Usage
@@ -85,6 +93,10 @@ Direct access of property is kept with magic method for backward compatible.
 	$sse->use_chunked_encodung = true; //Use chunked encoding. Some server may get problems with this and it defaults to false
 	$sse->keep_alive_time = 600; //The interval of sending a signal to keep the connection alive. Default: 300 seconds.
 	$sse->allow_cors = true; //Allow cross-domain access? Default: false. If you want others to access this must set to true.
+	$sse->content_encoding_none = false; // Disable compression in case content length is compressed (useful with php-fastcgi)
+	$sse->close_connection = false; // Send a "Connection: close" header before flush (useful with php-fastcgi)
+	$sse->pad_response_data = 0; // Concatenate N "\n" characters to force output buffer flushing
+	
 	?>
 ```
 
@@ -97,6 +109,8 @@ Direct access of property is kept with magic method for backward compatible.
 5. Fixed event loop handling where removing handlers at runtime can result in a broken state.
 6. Use Symfony HttpFoundation StreamedResponse to replace the old version
 7. Add Changelog and contributing guide.
+8. Add options useful with some php-fastCgi setups.
+9. Add option to pad data with "\n" characters to force output buffer flushing.
 
 ## Special For PHP 5.3 and 5.4
 If you see and error message like `your PHP version does not satisfy that requirement.`,

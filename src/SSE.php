@@ -29,6 +29,7 @@
  * @category libSSE-php
  * @author   Licson Lee <licson0729@gmail.com>
  * @author   Tony Yip <tony@opensource.hk>
+ * @author   Francesco Laricchia <franklar@gmail.com>
  * @license  http://opensource.org/licenses/MIT MIT License
  */
 
@@ -64,13 +65,16 @@ class SSE implements ArrayAccess
      * @var array
      */
     private $config = array(
-        'sleep_time' => 0.5,                // seconds to sleep after the data has been sent
-        'exec_limit' => 600,                // the time limit of the script in seconds
-        'client_reconnect' => 1,            // the time client to reconnect after connection has lost in seconds
-        'allow_cors' => false,              // Allow Cross-Origin Access?
-        'keep_alive_time' => 300,           // The interval of sending a signal to keep the connection alive
-        'is_reconnect' => false,            // A read-only flag indicates whether the user reconnects
-        'use_chunked_encoding' => false,    // Allow chunked encoding
+            'sleep_time' => 0.5,                // seconds to sleep after the data has been sent
+            'exec_limit' => 600,                // the time limit of the script in seconds
+            'client_reconnect' => 1,            // the time client to reconnect after connection has lost in seconds
+            'allow_cors' => false,              // Allow Cross-Origin Access?
+            'keep_alive_time' => 300,           // The interval of sending a signal to keep the connection alive
+            'is_reconnect' => false,            // A read-only flag indicates whether the user reconnects
+            'use_chunked_encoding' => false,    // Allow chunked encoding
+            'content_encoding_none' => false,   // Disable compression in case content length is compressed (useful with php-fastcgi)
+            'close_connection' => false,        // Send a "Connection: close" header before flush (useful with php-fastcgi)
+            'pad_response_data' => 0            // Concatenate N "\n" characters to force output buffer flushing
     );
 
     /**
@@ -149,6 +153,11 @@ class SSE implements ArrayAccess
      */
     public function flush()
     {
+        if ($this->close_connection) {
+            header('Connection: close');
+            header('Content-Length: '.ob_get_length());
+        }
+
         @ob_flush();
         @flush();
     }
@@ -188,6 +197,10 @@ class SSE implements ArrayAccess
      */
     private function wrapData($string)
     {
+        if ($this->pad_response_data && is_integer($this->pad_response_data) && $this->pad_response_data > 0) {
+            $string .= str_repeat("\n", $this->pad_response_data);
+        }
+
         return 'data:' . str_replace("\n","\ndata: ", $string);
     }
 
@@ -228,7 +241,7 @@ class SSE implements ArrayAccess
         $that = $this;
         $callback = function () use ($that) {
             $that->setStart(time());
-            echo 'retry: ' . ($that->client_reconnect * 1000) . "\n";	// Set the retry interval for the client
+            echo 'retry: ' . ($that->client_reconnect * 1000) . "\n";   // Set the retry interval for the client
             while (true) {
                 // Leave the loop if there are no more handlers
                 if (!$that->hasEventListener()) {
@@ -240,14 +253,14 @@ class SSE implements ArrayAccess
                     // From https://developer.mozilla.org/en-US/docs/Server-sent_events/Using_server-sent_events
                     echo ': ' . sha1(mt_rand()) . "\n\n";
                 }
-                
+
                 // Start to check for updates
                 foreach ($that->getEventListeners() as $event => $handler) {
                     if ($handler->check()) { // Check if the data is avaliable
                         $data = $handler->update(); // Get the data
                         $id = $that->getNewId();
                         $that->sendBlock($id, $data, $event);
-                        
+
                         // Make sure the data has been sent to the client
                         $that->flush();
                     }
@@ -264,9 +277,9 @@ class SSE implements ArrayAccess
 
 
         $response = new StreamedResponse($callback, Response::HTTP_OK, array(
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'X-Accel-Buffering' => 'no' // Disables FastCGI Buffering on Nginx
+                'Content-Type' => 'text/event-stream',
+                'Cache-Control' => 'no-cache',
+                'X-Accel-Buffering' => 'no' // Disables FastCGI Buffering on Nginx
         ));
 
         if($this->allow_cors){
@@ -276,6 +289,9 @@ class SSE implements ArrayAccess
 
         if($this->use_chunked_encoding)
             $response->headers->set('Transfer-encoding', 'chunked');
+
+        if ($this->content_encoding_none)
+            $response->headers->set('Content-Encoding', 'none');
 
         return $response;
     }
