@@ -1,6 +1,10 @@
 {
   "name": "frank-lar/sse",
+<<<<<<< HEAD
   "version": "2.2.0",
+=======
+  "version": "1.0.1",
+>>>>>>> 5890f5382314c62b981855fdb31d09534d7595c2
   "description": "An easy-to-use, object-oriented PHP library for Server-Sent Events",
   "type": "library",
   "keywords": ["sse", "php-sse", "eventstream", "Server-Sent Events"],
